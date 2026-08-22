@@ -1,0 +1,615 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public profile of an Orbit member",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "User UID matching auth.uid",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "username": {
+          "type": "string",
+          "description": "Normalized unique handle without @ symbol",
+          "minLength": 2,
+          "maxLength": 30,
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "URL to user profile picture or empty string",
+          "maxLength": 2048
+        },
+        "banner": {
+          "type": "string",
+          "description": "URL to user profile header banner image or empty string",
+          "maxLength": 2048
+        },
+        "bio": {
+          "type": "string",
+          "description": "User biography or personal signal statement",
+          "maxLength": 300
+        },
+        "countryCode": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-2 country code (e.g. IN, US, GB)",
+          "maxLength": 10
+        },
+        "countryName": {
+          "type": "string",
+          "description": "Official display country name",
+          "maxLength": 100
+        },
+        "location": {
+          "type": "string",
+          "description": "User country display name or location",
+          "maxLength": 100
+        },
+        "website": {
+          "type": "string",
+          "description": "Personal website or portfolio link",
+          "maxLength": 200
+        },
+        "interests": {
+          "type": "array",
+          "description": "List of topic tags of interest (max 12)",
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "joinedDate": {
+          "type": "string",
+          "description": "Human-readable joined month/year",
+          "maxLength": 40
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether the identity is officially verified"
+        },
+        "trustLevel": {
+          "type": "string",
+          "description": "Algorithmic or member trust tier",
+          "enum": ["Private", "Emerging", "Established", "Trusted"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp or server timestamp string",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp or server timestamp string",
+          "maxLength": 40
+        },
+        "profileDiscoverability": {
+          "type": "string",
+          "description": "Who can discover the user profile",
+          "enum": ["Public", "FollowersOnly", "Private"]
+        },
+        "defaultPostVisibility": {
+          "type": "string",
+          "description": "Default audience for newly created posts",
+          "enum": ["Public", "Followers", "Private"]
+        },
+        "directMessagesReach": {
+          "type": "string",
+          "description": "Who can send direct messages to the user",
+          "enum": ["Everyone", "Followers", "None"]
+        },
+        "notifications": {
+          "type": "object",
+          "description": "Notification preference triggers",
+          "properties": {
+            "likes": { "type": "boolean" },
+            "mentions": { "type": "boolean" },
+            "followers": { "type": "boolean" },
+            "messages": { "type": "boolean" },
+            "storyReplies": { "type": "boolean" },
+            "recommendations": { "type": "boolean" }
+          }
+        },
+        "reducedMotion": {
+          "type": "boolean",
+          "description": "Whether UI motion and animations are reduced"
+        },
+        "compactView": {
+          "type": "boolean",
+          "description": "Whether compact layout mode is enabled"
+        }
+      },
+      "required": ["id", "name", "username"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Private Personally Identifiable Information (PII) isolated from public profile",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "User account email",
+          "maxLength": 150
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp",
+          "maxLength": 40
+        }
+      }
+    },
+    "UsernameMapping": {
+      "title": "UsernameMapping",
+      "description": "Global unique username registry mapping normalized handles to UIDs",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "UID of the owning user",
+          "maxLength": 128
+        },
+        "username": {
+          "type": "string",
+          "description": "Normalized username",
+          "minLength": 2,
+          "maxLength": 30,
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Registration timestamp",
+          "maxLength": 40
+        }
+      },
+      "required": ["uid", "username"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "An individual signal transmission published to Orbit",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique post ID",
+          "maxLength": 128
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of the author",
+          "maxLength": 128
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Snapshot of author display name",
+          "maxLength": 80
+        },
+        "authorUsername": {
+          "type": "string",
+          "description": "Snapshot of author handle",
+          "maxLength": 30
+        },
+        "authorAvatar": {
+          "type": "string",
+          "description": "Snapshot of author avatar URL",
+          "maxLength": 2048
+        },
+        "authorVerified": {
+          "type": "boolean",
+          "description": "Snapshot of verification state"
+        },
+        "text": {
+          "type": "string",
+          "description": "Body text of the post",
+          "maxLength": 2000
+        },
+        "media": {
+          "type": "string",
+          "description": "URL of attached media",
+          "maxLength": 2048
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "Media MIME type category",
+          "enum": ["image", "video"]
+        },
+        "mediaName": {
+          "type": "string",
+          "description": "File name of attached media",
+          "maxLength": 120
+        },
+        "visibility": {
+          "type": "string",
+          "description": "Audience visibility scope",
+          "enum": ["Public", "Followers", "Private"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp string",
+          "maxLength": 40
+        },
+        "likes": {
+          "type": "number",
+          "description": "Aggregated likes counter"
+        },
+        "reposts": {
+          "type": "number",
+          "description": "Aggregated reposts counter"
+        },
+        "views": {
+          "type": "number",
+          "description": "Impressions view counter"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Topic hashtags",
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "isPinned": {
+          "type": "boolean",
+          "description": "Whether pinned to top of profile"
+        }
+      },
+      "required": ["authorId", "authorName", "authorUsername", "text", "visibility"]
+    },
+    "PostComment": {
+      "title": "PostComment",
+      "description": "Comment on a post",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Comment ID",
+          "maxLength": 128
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of commenter",
+          "maxLength": 128
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Commenter display name",
+          "maxLength": 80
+        },
+        "authorUsername": {
+          "type": "string",
+          "description": "Commenter handle",
+          "maxLength": 30
+        },
+        "authorAvatar": {
+          "type": "string",
+          "description": "Commenter avatar",
+          "maxLength": 2048
+        },
+        "text": {
+          "type": "string",
+          "description": "Comment text",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp",
+          "maxLength": 40
+        },
+        "likes": {
+          "type": "number",
+          "description": "Likes on comment"
+        }
+      },
+      "required": ["authorId", "authorName", "authorUsername", "text"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "Ephemeral 24-hour visual transmission",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Story unique ID",
+          "maxLength": 128
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Author UID",
+          "maxLength": 128
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Author display name",
+          "maxLength": 80
+        },
+        "authorUsername": {
+          "type": "string",
+          "description": "Author handle",
+          "maxLength": 30
+        },
+        "authorAvatar": {
+          "type": "string",
+          "description": "Author avatar URL",
+          "maxLength": 2048
+        },
+        "media": {
+          "type": "string",
+          "description": "Story media asset URL",
+          "maxLength": 2048
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "Media type",
+          "enum": ["image", "video"]
+        },
+        "caption": {
+          "type": "string",
+          "description": "Optional story caption",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "maxLength": 40
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Expiration timestamp (+24h)",
+          "maxLength": 40
+        }
+      },
+      "required": ["authorId", "authorName", "authorUsername", "media", "mediaType"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Direct message thread between participants",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Conversation ID",
+          "maxLength": 128
+        },
+        "participantIds": {
+          "type": "array",
+          "description": "UIDs of the 2 participants",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last message timestamp",
+          "maxLength": 40
+        }
+      },
+      "required": ["participantIds"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual direct message within a conversation",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Message ID",
+          "maxLength": 128
+        },
+        "senderId": {
+          "type": "string",
+          "description": "UID of sender",
+          "maxLength": 128
+        },
+        "receiverId": {
+          "type": "string",
+          "description": "UID of receiver",
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "description": "Message content",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp",
+          "maxLength": 40
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Read status"
+        }
+      },
+      "required": ["senderId", "receiverId", "text"]
+    },
+    "OrbitNotification": {
+      "title": "OrbitNotification",
+      "description": "Real-time user notification event",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Notification ID",
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "description": "Notification category",
+          "enum": ["like", "comment", "follow", "repost", "message", "system"]
+        },
+        "title": {
+          "type": "string",
+          "description": "Summary title",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed event text",
+          "maxLength": 300
+        },
+        "targetId": {
+          "type": "string",
+          "description": "Target post or conversation ID",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Event timestamp",
+          "maxLength": 40
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Read status"
+        }
+      },
+      "required": ["type", "title", "description"]
+    },
+    "PostLike": {
+      "title": "PostLike",
+      "description": "Like record on post",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the liking user",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp",
+          "maxLength": 40
+        }
+      },
+      "required": ["userId"]
+    },
+    "PostRepost": {
+      "title": "PostRepost",
+      "description": "Repost record on post",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the reposting user",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp",
+          "maxLength": 40
+        }
+      },
+      "required": ["userId"]
+    },
+    "UserLikedPost": {
+      "title": "UserLikedPost",
+      "description": "User liked post reference",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "Target post ID",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp",
+          "maxLength": 40
+        }
+      },
+      "required": ["postId"]
+    },
+    "UserRepost": {
+      "title": "UserRepost",
+      "description": "User repost reference",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "Target post ID",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp",
+          "maxLength": 40
+        }
+      },
+      "required": ["postId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Public user profile document identified by auth.uid"
+    },
+    "/users/{userId}/private/info": {
+      "schema": "UserPrivateInfo",
+      "description": "Isolated private PII data readable only by the owning user"
+    },
+    "/users/{userId}/likedPosts/{postId}": {
+      "schema": "UserLikedPost",
+      "description": "Posts liked by the user"
+    },
+    "/users/{userId}/reposts/{postId}": {
+      "schema": "UserRepost",
+      "description": "Posts reposted by the user"
+    },
+    "/users/{userId}/savedPosts/{postId}": {
+      "schema": "UserLikedPost",
+      "description": "Posts bookmarked by the user"
+    },
+    "/usernames/{username}": {
+      "schema": "UsernameMapping",
+      "description": "Unique handle registry ensuring handle exclusivity across Orbit"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Public and follower broadcast transmissions"
+    },
+    "/posts/{postId}/likes/{userId}": {
+      "schema": "PostLike",
+      "description": "Likes on the post"
+    },
+    "/posts/{postId}/reposts/{userId}": {
+      "schema": "PostRepost",
+      "description": "Reposts on the post"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "PostComment",
+      "description": "Replies and discussions on posts"
+    },
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "24-hour visual ephemeral stories"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct message thread metadata"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Direct messages inside conversation"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "OrbitNotification",
+      "description": "Personalized user notification records"
+    },
+    "/postLikes/{likeId}": {
+      "schema": "PostLike",
+      "description": "Permanent post likes mapping user to post"
+    },
+    "/postReposts/{repostId}": {
+      "schema": "PostRepost",
+      "description": "Permanent post reposts mapping user to post"
+    }
+  }
+}

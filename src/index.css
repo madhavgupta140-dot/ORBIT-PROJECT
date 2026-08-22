@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Barlow Condensed", -apple-system, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Plus Jakarta Sans", -apple-system, sans-serif;
+
+  --color-orbit-bg: #0a0a0a;
+  --color-orbit-surface: #101010;
+  --color-orbit-surface-strong: #141414;
+  --color-orbit-border: #1f1f1f;
+  --color-orbit-border-light: #2a2a2a;
+  --color-orbit-text: #f5f5f4;
+  --color-orbit-muted: #a8a29e;
+  --color-orbit-tertiary: #78716c;
+  --color-orbit-accent: #ffffff;
+  --color-orbit-accent-hover: #e5e5e5;
+  --color-orbit-live: #22c55e;
+}
+
+/* Custom scrollbars for Minimalist Dark feel */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}
+
+/* Typography Utility Classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-serif-lux {
+  font-family: var(--font-serif);
+}
+
+.font-mono-tech {
+  font-family: var(--font-mono);
+}
+
+/* Technical Label styling */
+.tech-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #a8a29e;
+}
+
+/* Smooth active focus styles */
+:focus-visible {
+  outline: 1px solid #737373;
+  outline-offset: 1px;
+}

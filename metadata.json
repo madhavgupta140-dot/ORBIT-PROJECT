@@ -1,0 +1,7 @@
+{
+  "name": "ORBIT",
+  "description": "A dark command center for a personal social orbit with signals, momentum, trust, reach, and discovery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
