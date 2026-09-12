@@ -21,9 +21,12 @@ export const ProfileView: React.FC = () => {
   const {
     currentUser,
     posts,
+    savedPosts,
     followingIds,
+    followerIds,
     openEditProfile,
     openCreatePost,
+    openFollowList,
     showToast,
   } = useOrbit();
 
@@ -41,9 +44,14 @@ export const ProfileView: React.FC = () => {
   const myPosts = posts.filter((p) => p.authorId === currentUser.id);
   const myMediaPosts = myPosts.filter((p) => Boolean(p.media));
   const myLikedPosts = posts.filter((p) => p.likedByMe);
-  const mySavedPosts = posts.filter((p) => p.savedByMe);
+  const mySavedPosts = savedPosts;
 
-  const followersCount = 0;
+  const followersCount = typeof currentUser.followerCount === 'number'
+    ? Math.max(currentUser.followerCount, followerIds.length)
+    : followerIds.length;
+  const followingCount = typeof currentUser.followingCount === 'number'
+    ? Math.max(currentUser.followingCount, followingIds.length)
+    : followingIds.length;
   const displayLocation = currentUser.countryName || currentUser.location;
 
   const getActiveList = () => {
@@ -184,16 +192,16 @@ export const ProfileView: React.FC = () => {
           <div className="flex items-center gap-5 text-sm pt-1">
             <button
               type="button"
-              onClick={() => showToast('Following List', `Following ${followingIds.length} creators`)}
-              className="hover:underline cursor-pointer"
+              onClick={() => openFollowList('following', currentUser)}
+              className="hover:underline cursor-pointer transition-colors hover:text-stone-300 focus:outline-none"
             >
-              <span className="font-bold text-stone-100">{followingIds.length}</span>{' '}
+              <span className="font-bold text-stone-100">{followingCount}</span>{' '}
               <span className="text-stone-500">Following</span>
             </button>
             <button
               type="button"
-              onClick={() => showToast('Followers List', `${followersCount} followers in your orbit`)}
-              className="hover:underline cursor-pointer"
+              onClick={() => openFollowList('followers', currentUser)}
+              className="hover:underline cursor-pointer transition-colors hover:text-stone-300 focus:outline-none"
             >
               <span className="font-bold text-stone-100">{followersCount}</span>{' '}
               <span className="text-stone-500">Followers</span>
@@ -270,7 +278,7 @@ export const ProfileView: React.FC = () => {
 
               <h3 className="font-bold text-base text-stone-100 mb-1">
                 {activeTab === 'saved'
-                  ? 'No Saved Posts'
+                  ? 'No saved posts yet.'
                   : activeTab === 'media'
                   ? 'No Photos or Videos'
                   : activeTab === 'likes'
@@ -280,7 +288,7 @@ export const ProfileView: React.FC = () => {
 
               <p className="text-xs text-stone-400 max-w-sm mb-6 leading-relaxed">
                 {activeTab === 'saved'
-                  ? 'Posts you bookmark will appear here for easy reference.'
+                  ? 'Bookmark posts to revisit them later.'
                   : activeTab === 'media'
                   ? 'Photos and videos you attach to your posts will be archived here.'
                   : activeTab === 'likes'

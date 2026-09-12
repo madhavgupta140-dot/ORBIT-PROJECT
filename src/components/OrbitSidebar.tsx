@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Home,
   Compass,
+  Bell,
   MessageCircle,
   User,
   SlidersHorizontal,
@@ -35,7 +36,13 @@ export const OrbitSidebar: React.FC = () => {
   }> = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'explore', label: 'Explore', icon: Compass },
-    { id: 'messages', label: 'Messages', icon: MessageCircle, badge: unreadNotificationsCount > 0 ? 1 : undefined },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      icon: Bell,
+      badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
+    },
+    { id: 'messages', label: 'Messages', icon: MessageCircle },
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
   ];

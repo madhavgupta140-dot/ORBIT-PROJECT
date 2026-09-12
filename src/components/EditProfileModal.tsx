@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, Trash2, Image as ImageIcon } from 'lucide-react';
+import { X, Camera, Trash2, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { useOrbit } from '../context/OrbitContext';
 import { UserAvatar } from './UserAvatar';
 import { CountrySelector } from './CountrySelector';
 import { CountryOption } from '../data/countries';
+import { uploadMedia } from '../services/mediaUploadService';
 
 export const EditProfileModal: React.FC = () => {
-  const { isEditProfileOpen, closeEditProfile, currentUser, updateCurrentUser, showToast } = useOrbit();
+  const { isEditProfileOpen, closeEditProfile, currentUser, updateCurrentUser, showToast, authUser } = useOrbit();
 
   const [name, setName] = useState(currentUser?.name || '');
   const [username, setUsername] = useState(currentUser?.username || '');
@@ -16,6 +17,10 @@ export const EditProfileModal: React.FC = () => {
   const [countryCode, setCountryCode] = useState(currentUser?.countryCode || '');
   const [countryName, setCountryName] = useState(currentUser?.countryName || currentUser?.location || '');
   const [website, setWebsite] = useState(currentUser?.website || '');
+
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [selectedBannerFile, setSelectedBannerFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -30,35 +35,35 @@ export const EditProfileModal: React.FC = () => {
       setCountryCode(currentUser.countryCode || '');
       setCountryName(currentUser.countryName || currentUser.location || '');
       setWebsite(currentUser.website || '');
+      setSelectedAvatarFile(null);
+      setSelectedBannerFile(null);
+      setIsSaving(false);
     }
   }, [isEditProfileOpen, currentUser]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isEditProfileOpen) {
+      if (e.key === 'Escape' && isEditProfileOpen && !isSaving) {
         closeEditProfile();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditProfileOpen, closeEditProfile]);
+  }, [isEditProfileOpen, closeEditProfile, isSaving]);
 
   if (!isEditProfileOpen || !currentUser) return null;
 
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setAvatar(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      setSelectedAvatarFile(file);
+      const url = URL.createObjectURL(file);
+      setAvatar(url);
     }
   };
 
   const handleRemoveAvatar = () => {
+    setSelectedAvatarFile(null);
     setAvatar('');
     if (avatarInputRef.current) {
       avatarInputRef.current.value = '';
@@ -68,17 +73,14 @@ export const EditProfileModal: React.FC = () => {
   const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setBanner(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      setSelectedBannerFile(file);
+      const url = URL.createObjectURL(file);
+      setBanner(url);
     }
   };
 
   const handleRemoveBanner = () => {
+    setSelectedBannerFile(null);
     setBanner('');
     if (bannerInputRef.current) {
       bannerInputRef.current.value = '';
@@ -95,27 +97,63 @@ export const EditProfileModal: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+
     if (!name.trim() || !username.trim()) {
       showToast('Validation Error', 'Display name and handle are required.', 'alert');
       return;
     }
 
-    const updates: Partial<typeof currentUser> = {
-      name: name.trim(),
-      username: username.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''),
-      bio: bio.trim(),
-      avatar: avatar.trim(),
-      banner: banner.trim(),
-      countryCode: countryCode || undefined,
-      countryName: countryName || undefined,
-      location: countryName || undefined,
-      website: website.trim(),
-    };
+    setIsSaving(true);
 
-    updateCurrentUser(updates);
-    closeEditProfile();
+    try {
+      let finalAvatarUrl = avatar.trim();
+      let finalBannerUrl = banner.trim();
+
+      // Upload avatar file if changed
+      if (selectedAvatarFile && authUser) {
+        const avatarUpload = uploadMedia({
+          file: selectedAvatarFile,
+          folder: 'avatars',
+          entityId: currentUser.id,
+        });
+        const res = await avatarUpload.promise;
+        finalAvatarUrl = res.downloadURL;
+      }
+
+      // Upload banner file if changed
+      if (selectedBannerFile && authUser) {
+        const bannerUpload = uploadMedia({
+          file: selectedBannerFile,
+          folder: 'banners',
+          entityId: currentUser.id,
+        });
+        const res = await bannerUpload.promise;
+        finalBannerUrl = res.downloadURL;
+      }
+
+      const updates: Partial<typeof currentUser> = {
+        name: name.trim(),
+        username: username.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''),
+        bio: bio.trim(),
+        avatar: finalAvatarUrl,
+        banner: finalBannerUrl,
+        countryCode: countryCode || undefined,
+        countryName: countryName || undefined,
+        location: countryName || undefined,
+        website: website.trim(),
+      };
+
+      await updateCurrentUser(updates);
+      closeEditProfile();
+    } catch (err: any) {
+      console.error('[Profile Update] Failed:', err);
+      showToast('Profile Update Error', err?.message || 'Could not update profile.', 'alert');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -359,16 +397,25 @@ export const EditProfileModal: React.FC = () => {
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-800/80">
             <button
               type="button"
+              disabled={isSaving}
               onClick={closeEditProfile}
-              className="px-4 py-2 text-xs font-semibold text-stone-400 hover:text-stone-200 cursor-pointer transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-stone-400 hover:text-stone-200 disabled:opacity-40 cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-white hover:bg-stone-200 text-black font-bold text-xs rounded-full transition-all shadow-md cursor-pointer active:scale-95"
+              disabled={isSaving}
+              className="px-6 py-2 bg-white hover:bg-stone-200 disabled:opacity-50 text-black font-bold text-xs rounded-full transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-1.5"
             >
-              Save Changes
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                'Save Changes'
+              )}
             </button>
           </div>
         </form>

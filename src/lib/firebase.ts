@@ -8,6 +8,7 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   doc,
   getDoc,
@@ -22,13 +23,36 @@ import {
   getDocFromServer,
   getDocs,
 } from 'firebase/firestore';
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  uploadBytesResumable,
+  getDownloadURL,
+  deleteObject,
+} from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile, Post, Story, Conversation, OrbitNotification, OrbitSettings } from '../types';
 
-// 1. Initialize Firebase Services
+// 1. Initialize Firebase Services with Long Polling support for container/iframe environments
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+let firestoreInstance;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalForceLongPolling: true,
+    },
+    firebaseConfig.firestoreDatabaseId
+  );
+} catch (e) {
+  firestoreInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+}
+
+export const db = firestoreInstance;
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 export const googleAuthProvider = new GoogleAuthProvider();
 
 // Operation Types for error diagnosis
@@ -91,10 +115,17 @@ export async function testConnection(): Promise<boolean> {
     console.log('[ORBIT Backend] Connected to Cloud Firestore database.');
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('[ORBIT Backend] Offline / unable to reach server directly, operating with local cache.');
+    if (
+      error instanceof Error &&
+      (error.message.includes('the client is offline') ||
+        error.message.includes('unavailable') ||
+        (error as any).code === 'unavailable')
+    ) {
+      console.warn(
+        '[ORBIT Backend] Cloud Firestore is operating in offline/cached mode. Real-time updates will automatically sync when online.'
+      );
     } else {
-      console.log('[ORBIT Backend] Initial probe response:', error);
+      console.info('[ORBIT Backend] Connection probe status:', error);
     }
     return false;
   }
@@ -134,6 +165,17 @@ export function sanitizeFirestoreData<T>(obj: T): T {
       .map((item) => sanitizeFirestoreData(item)) as unknown as T;
   }
   if (typeof obj === 'object' && !(obj instanceof Date)) {
+    // Preserve Firestore Sentinel FieldValues (like serverTimestamp()) and Timestamps
+    if (
+      '_methodName' in (obj as any) ||
+      '_delegate' in (obj as any) ||
+      typeof (obj as any).toMillis === 'function' ||
+      typeof (obj as any).toDate === 'function' ||
+      (obj as any)?.constructor?.name === 'FieldValue' ||
+      (obj as any)?.constructor?.name === 'Timestamp'
+    ) {
+      return obj;
+    }
     const cleaned: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value !== undefined) {
@@ -219,3 +261,73 @@ export async function saveUserProfile(profile: UserProfile): Promise<void> {
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
+
+// 5. Firebase Storage Helpers
+export interface UploadMediaResult {
+  downloadURL: string;
+  storagePath: string;
+}
+
+export interface StorageDiagnosticError {
+  code: string;
+  message: string;
+  userFacingMessage: string;
+  rawError: any;
+}
+
+export function parseStorageError(error: any): StorageDiagnosticError {
+  const code = error?.code || 'storage/unknown';
+  const message = error?.message || String(error);
+
+  console.error(`[Firebase Storage Error Diagnostic] Code: "${code}" | Message: "${message}"`, {
+    code,
+    message,
+    name: error?.name,
+    serverResponse: error?.serverResponse,
+    customData: error?.customData,
+    stack: error?.stack,
+  });
+
+  let userFacingMessage = "Couldn't share story. Try again.";
+  switch (code) {
+    case 'storage/unauthorized':
+      userFacingMessage = 'Account authorization expired. Please sign in again.';
+      break;
+    case 'storage/object-not-found':
+      userFacingMessage = 'The selected file could not be found.';
+      break;
+    case 'storage/quota-exceeded':
+      userFacingMessage = 'Storage limit reached. Please try again later.';
+      break;
+    case 'storage/retry-limit-exceeded':
+    case 'storage/timeout':
+      userFacingMessage = 'Connection timed out. Please try again.';
+      break;
+    case 'storage/canceled':
+      userFacingMessage = 'Upload was cancelled.';
+      break;
+    default:
+      userFacingMessage = "Couldn't share story. Try again.";
+      break;
+  }
+
+  return {
+    code,
+    message,
+    userFacingMessage,
+    rawError: error,
+  };
+}
+
+// Re-export unified media storage services from mediaUploadService
+export {
+  uploadMedia,
+  uploadMultipleMedia,
+  uploadMediaWithRetry,
+  deleteUploadedMedia,
+  deleteUploadedMedia as deleteMediaFile,
+  UploadCanceledError,
+  UploadFailedError,
+} from '../services/mediaUploadService';
+export type { MediaUploadResult, MediaUploadOptions, CancellableUpload } from '../services/mediaUploadService';
+

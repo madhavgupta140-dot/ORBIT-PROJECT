@@ -9,13 +9,16 @@ import { EditProfileModal } from './components/EditProfileModal';
 import { SearchOverlay } from './components/SearchOverlay';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import { NewMessageModal } from './components/NewMessageModal';
+import { CreateGroupModal } from './components/CreateGroupModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { FollowListModal } from './components/FollowListModal';
 import { ToastContainer } from './components/ToastContainer';
 import { OrbitLogo } from './components/OrbitLogo';
 import { AuthView } from './views/AuthView';
 
 import { HomeView } from './views/HomeView';
 import { ExploreView } from './views/ExploreView';
+import { NotificationsView } from './views/NotificationsView';
 import { MessagesView } from './views/MessagesView';
 import { ProfileView } from './views/ProfileView';
 import { SettingsView } from './views/SettingsView';
@@ -24,11 +27,27 @@ import { TermsOfServiceView } from './views/TermsOfServiceView';
 import { StatusView } from './views/StatusView';
 
 const OrbitAppContent: React.FC = () => {
-  const { activeTab, setActiveTab, authUser, isAuthReady, openSearch, openCreatePost } = useOrbit();
+  const {
+    activeTab,
+    setActiveTab,
+    authUser,
+    isAuthReady,
+    openSearch,
+    openCreatePost,
+    chatWorkspaceMode,
+    setChatWorkspaceMode,
+  } = useOrbit();
 
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC key exits fullscreen chat mode
+      if (e.key === 'Escape' && chatWorkspaceMode === 'fullscreen') {
+        e.preventDefault();
+        setChatWorkspaceMode('normal');
+        return;
+      }
+
       // Don't trigger if typing in an input/textarea
       const target = e.target as HTMLElement;
       if (
@@ -50,7 +69,7 @@ const OrbitAppContent: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [openSearch, openCreatePost]);
+  }, [openSearch, openCreatePost, chatWorkspaceMode, setChatWorkspaceMode]);
 
   // Loading state while Firebase auth status is resolving
   if (!isAuthReady) {
@@ -105,6 +124,8 @@ const OrbitAppContent: React.FC = () => {
         return <HomeView />;
       case 'explore':
         return <ExploreView />;
+      case 'notifications':
+        return <NotificationsView />;
       case 'messages':
         return <MessagesView />;
       case 'profile':
@@ -121,6 +142,30 @@ const OrbitAppContent: React.FC = () => {
         return <HomeView />;
     }
   };
+
+  const isFullscreenChat = activeTab === 'messages' && chatWorkspaceMode === 'fullscreen';
+
+  if (isFullscreenChat) {
+    return (
+      <div id="orbit-root-layout" className="h-screen w-screen bg-[#0a0a0a] text-stone-200 overflow-hidden flex flex-col font-sans">
+        <main className="flex-1 flex flex-col h-full w-full">
+          {renderActiveView()}
+        </main>
+        {/* Modals & Overlays still available */}
+        <CreatePostModal />
+        <StoryCreatorModal />
+        <StoryViewerModal />
+        <EditProfileModal />
+        <SearchOverlay />
+        <NotificationDrawer />
+        <NewMessageModal />
+        <CreateGroupModal />
+        <UserProfileModal />
+        <FollowListModal />
+        <ToastContainer />
+      </div>
+    );
+  }
 
   return (
     <div id="orbit-root-layout" className="min-h-screen bg-[#0a0a0a] text-stone-200 flex font-sans">
@@ -148,7 +193,9 @@ const OrbitAppContent: React.FC = () => {
       <SearchOverlay />
       <NotificationDrawer />
       <NewMessageModal />
+      <CreateGroupModal />
       <UserProfileModal />
+      <FollowListModal />
       <ToastContainer />
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Send, CheckCircle2, User, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Search, Send, CheckCircle2, User, AlertCircle, Loader2, Users } from 'lucide-react';
 import { useOrbit } from '../context/OrbitContext';
 import { UserProfile } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -9,7 +9,9 @@ export const NewMessageModal: React.FC = () => {
   const {
     isNewMessageOpen,
     closeNewMessage,
+    openCreateGroup,
     sendMessage,
+    setActiveConversationId,
     setActiveTab,
     currentUser,
     allUsers,
@@ -97,6 +99,8 @@ export const NewMessageModal: React.FC = () => {
     if (!selectedUser || !messageText.trim()) return;
 
     try {
+      const convId = [currentUser.id, selectedUser.id].sort().join('_');
+      setActiveConversationId(convId);
       await sendMessage(selectedUser.id, messageText.trim());
       setActiveTab('messages');
       closeNewMessage();
@@ -128,6 +132,29 @@ export const NewMessageModal: React.FC = () => {
         <form onSubmit={handleSend} className="flex flex-col gap-4">
           {!selectedUser ? (
             <>
+              {/* Shortcut to Create Group */}
+              <button
+                type="button"
+                onClick={() => {
+                  closeNewMessage();
+                  openCreateGroup();
+                }}
+                className="w-full p-2.5 bg-stone-900/70 hover:bg-stone-800/80 border border-stone-800 rounded-xl flex items-center justify-between text-left transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-stone-800 group-hover:bg-stone-700 flex items-center justify-center text-white transition-colors">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-stone-200">Create a Group Chat</p>
+                    <p className="text-[10px] text-stone-400">Add multiple creators to a shared space</p>
+                  </div>
+                </div>
+                <span className="text-xs text-stone-400 group-hover:text-white transition-colors font-medium mr-1">
+                  Start &rarr;
+                </span>
+              </button>
+
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-stone-500 absolute left-3.5 top-3" />

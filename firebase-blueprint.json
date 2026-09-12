@@ -80,6 +80,14 @@
           "description": "Algorithmic or member trust tier",
           "enum": ["Private", "Emerging", "Established", "Trusted"]
         },
+        "followerCount": {
+          "type": "number",
+          "description": "Number of users following this profile"
+        },
+        "followingCount": {
+          "type": "number",
+          "description": "Number of users this profile follows"
+        },
         "createdAt": {
           "type": "string",
           "description": "ISO timestamp or server timestamp string",
@@ -100,10 +108,39 @@
           "description": "Default audience for newly created posts",
           "enum": ["Public", "Followers", "Private"]
         },
+        "directMessageReach": {
+          "type": "string",
+          "description": "Who can send direct messages to the user",
+          "enum": ["Everyone", "Followers", "None"]
+        },
         "directMessagesReach": {
           "type": "string",
           "description": "Who can send direct messages to the user",
           "enum": ["Everyone", "Followers", "None"]
+        },
+        "likesNotifications": {
+          "type": "boolean",
+          "description": "Notification trigger for likes and reactions"
+        },
+        "mentionsNotifications": {
+          "type": "boolean",
+          "description": "Notification trigger for mentions and replies"
+        },
+        "followerNotifications": {
+          "type": "boolean",
+          "description": "Notification trigger for new followers"
+        },
+        "directMessageNotifications": {
+          "type": "boolean",
+          "description": "Notification trigger for direct messages"
+        },
+        "storyNotifications": {
+          "type": "boolean",
+          "description": "Notification trigger for story replies and activity"
+        },
+        "recommendationNotifications": {
+          "type": "boolean",
+          "description": "Notification trigger for curated recommendations"
         },
         "notifications": {
           "type": "object",
@@ -114,7 +151,10 @@
             "followers": { "type": "boolean" },
             "messages": { "type": "boolean" },
             "storyReplies": { "type": "boolean" },
-            "recommendations": { "type": "boolean" }
+            "recommendations": { "type": "boolean" },
+            "comments": { "type": "boolean" },
+            "follows": { "type": "boolean" },
+            "storyActivity": { "type": "boolean" }
           }
         },
         "reducedMotion": {
@@ -122,6 +162,10 @@
           "description": "Whether UI motion and animations are reduced"
         },
         "compactView": {
+          "type": "boolean",
+          "description": "Whether compact layout mode is enabled"
+        },
+        "compactMode": {
           "type": "boolean",
           "description": "Whether compact layout mode is enabled"
         }
@@ -311,7 +355,7 @@
     },
     "Story": {
       "title": "Story",
-      "description": "Ephemeral 24-hour visual transmission",
+      "description": "Ephemeral 24-hour visual transmission (Story V2)",
       "type": "object",
       "properties": {
         "id": {
@@ -320,6 +364,11 @@
           "maxLength": 128
         },
         "authorId": {
+          "type": "string",
+          "description": "Author UID",
+          "maxLength": 128
+        },
+        "authorUid": {
           "type": "string",
           "description": "Author UID",
           "maxLength": 128
@@ -339,10 +388,24 @@
           "description": "Author avatar URL",
           "maxLength": 2048
         },
+        "authorVerified": {
+          "type": "boolean",
+          "description": "Author verified status"
+        },
         "media": {
           "type": "string",
           "description": "Story media asset URL",
           "maxLength": 2048
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "Story media download URL",
+          "maxLength": 2048
+        },
+        "storagePath": {
+          "type": "string",
+          "description": "Firebase Storage path (stories/{uid}/{storyId}/{filename})",
+          "maxLength": 1024
         },
         "mediaType": {
           "type": "string",
@@ -363,9 +426,98 @@
           "type": "string",
           "description": "Expiration timestamp (+24h)",
           "maxLength": 40
+        },
+        "expiresAtMs": {
+          "type": "number",
+          "description": "Expiration time in epoch milliseconds"
+        },
+        "viewers": {
+          "type": "array",
+          "description": "List of user UIDs who have viewed this story",
+          "items": { "type": "string" }
+        },
+        "reactions": {
+          "type": "object",
+          "description": "Map of emoji to reaction count",
+          "additionalProperties": { "type": "number" }
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Soft delete or deletion flag"
         }
       },
       "required": ["authorId", "authorName", "authorUsername", "media", "mediaType"]
+    },
+    "StoryViewer": {
+      "title": "StoryViewer",
+      "description": "Viewer presence record for a story",
+      "type": "object",
+      "properties": {
+        "viewerUid": {
+          "type": "string",
+          "description": "UID of the member viewing the story",
+          "maxLength": 128
+        },
+        "viewerName": {
+          "type": "string",
+          "description": "Display name of viewer",
+          "maxLength": 80
+        },
+        "viewerUsername": {
+          "type": "string",
+          "description": "Handle of viewer",
+          "maxLength": 30
+        },
+        "viewerAvatar": {
+          "type": "string",
+          "description": "Avatar URL of viewer",
+          "maxLength": 2048
+        },
+        "viewedAt": {
+          "type": "string",
+          "description": "Timestamp when viewed",
+          "maxLength": 40
+        }
+      },
+      "required": ["viewerUid", "viewerName", "viewerUsername"]
+    },
+    "StoryReaction": {
+      "title": "StoryReaction",
+      "description": "Real-time emoji reaction on a story",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the member reacting",
+          "maxLength": 128
+        },
+        "userName": {
+          "type": "string",
+          "description": "Display name of reacting member",
+          "maxLength": 80
+        },
+        "userUsername": {
+          "type": "string",
+          "description": "Handle of reacting member",
+          "maxLength": 30
+        },
+        "userAvatar": {
+          "type": "string",
+          "description": "Avatar URL of reacting member",
+          "maxLength": 2048
+        },
+        "emoji": {
+          "type": "string",
+          "description": "Reaction emoji character",
+          "enum": ["❤️", "🔥", "😂", "😮", "😢"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when reacted",
+          "maxLength": 40
+        }
+      },
+      "required": ["userId", "emoji"]
     },
     "Conversation": {
       "title": "Conversation",
@@ -384,6 +536,19 @@
             "type": "string",
             "maxLength": 128
           }
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "Whether the conversation is pinned by participant"
+        },
+        "pinnedAt": {
+          "type": "string",
+          "description": "Timestamp when pinned",
+          "maxLength": 40
+        },
+        "pinnedBy": {
+          "type": "object",
+          "description": "Map of user IDs to pinned boolean status"
         },
         "updatedAt": {
           "type": "string",
@@ -427,6 +592,14 @@
         "isRead": {
           "type": "boolean",
           "description": "Read status"
+        },
+        "isForwarded": {
+          "type": "boolean",
+          "description": "Whether message was forwarded from another conversation"
+        },
+        "reactions": {
+          "type": "object",
+          "description": "Emoji reactions map: emoji -> array of user IDs"
         }
       },
       "required": ["senderId", "receiverId", "text"]
@@ -544,6 +717,205 @@
         }
       },
       "required": ["postId"]
+    },
+    "SavedPost": {
+      "title": "SavedPost",
+      "description": "User bookmarked post reference document",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "Target post ID",
+          "maxLength": 128
+        },
+        "savedAt": {
+          "type": "string",
+          "description": "Timestamp when post was bookmarked",
+          "maxLength": 40
+        }
+      },
+      "required": ["postId"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "One follow relationship mapping a follower UID to a following UID",
+      "type": "object",
+      "properties": {
+        "followerUid": {
+          "type": "string",
+          "description": "UID of the user who initiated the follow",
+          "maxLength": 128
+        },
+        "followingUid": {
+          "type": "string",
+          "description": "UID of the target user being followed",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of follow initiation",
+          "maxLength": 40
+        }
+      },
+      "required": ["followerUid", "followingUid"]
+    },
+    "GroupChat": {
+      "title": "GroupChat",
+      "description": "Multi-member collaborative group conversation",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique group ID",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the group",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL to group avatar icon or image",
+          "maxLength": 2048
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief group description or topic",
+          "maxLength": 300
+        },
+        "ownerUid": {
+          "type": "string",
+          "description": "UID of the group creator and primary administrator",
+          "maxLength": 128
+        },
+        "admins": {
+          "type": "array",
+          "description": "List of administrator UIDs",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "members": {
+          "type": "array",
+          "description": "List of all participant member UIDs (min 2, max 100)",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when group was created",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of latest group activity",
+          "maxLength": 40
+        },
+        "lastMessage": {
+          "type": "string",
+          "description": "Preview snippet of last message sent",
+          "maxLength": 500
+        },
+        "lastMessageAt": {
+          "type": "string",
+          "description": "Timestamp of last message",
+          "maxLength": 40
+        },
+        "lastSenderUid": {
+          "type": "string",
+          "description": "UID of last message sender",
+          "maxLength": 128
+        },
+        "isGroup": {
+          "type": "boolean",
+          "description": "Discriminator flag identifying document as a group"
+        }
+      },
+      "required": ["id", "name", "ownerUid", "admins", "members", "isGroup"]
+    },
+    "GroupChatMessage": {
+      "title": "GroupChatMessage",
+      "description": "Individual message sent within a group conversation",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique message ID",
+          "maxLength": 128
+        },
+        "senderUid": {
+          "type": "string",
+          "description": "UID of sender",
+          "maxLength": 128
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Cached display name of sender",
+          "maxLength": 80
+        },
+        "senderUsername": {
+          "type": "string",
+          "description": "Cached handle of sender",
+          "maxLength": 40
+        },
+        "senderAvatar": {
+          "type": "string",
+          "description": "Cached avatar URL of sender",
+          "maxLength": 2048
+        },
+        "text": {
+          "type": "string",
+          "description": "Message text content",
+          "maxLength": 2000
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "Optional download URL of attached media",
+          "maxLength": 2048
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "MIME type category (image, video, document)",
+          "maxLength": 50
+        },
+        "mediaName": {
+          "type": "string",
+          "description": "Optional original file name of attached media",
+          "maxLength": 256
+        },
+        "replyTo": {
+          "type": "string",
+          "description": "Optional ID of message being replied to",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of message creation",
+          "maxLength": 40
+        },
+        "edited": {
+          "type": "boolean",
+          "description": "Whether message was edited"
+        },
+        "deletedFor": {
+          "type": "array",
+          "description": "List of user UIDs who deleted message for themselves",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "isSystem": {
+          "type": "boolean",
+          "description": "Whether message is an automated system announcement"
+        }
+      },
+      "required": ["id", "senderUid"]
     }
   },
   "firestore": {
@@ -564,8 +936,12 @@
       "description": "Posts reposted by the user"
     },
     "/users/{userId}/savedPosts/{postId}": {
-      "schema": "UserLikedPost",
+      "schema": "SavedPost",
       "description": "Posts bookmarked by the user"
+    },
+    "/users/{userId}/following/{targetUserId}": {
+      "schema": "Follow",
+      "description": "Subcollection of users being followed"
     },
     "/usernames/{username}": {
       "schema": "UsernameMapping",
@@ -591,6 +967,14 @@
       "schema": "Story",
       "description": "24-hour visual ephemeral stories"
     },
+    "/stories/{storyId}/viewers/{viewerUid}": {
+      "schema": "StoryViewer",
+      "description": "Viewer records for a story"
+    },
+    "/stories/{storyId}/reactions/{userId}": {
+      "schema": "StoryReaction",
+      "description": "Emoji reactions on a story"
+    },
     "/conversations/{conversationId}": {
       "schema": "Conversation",
       "description": "Direct message thread metadata"
@@ -603,6 +987,10 @@
       "schema": "OrbitNotification",
       "description": "Personalized user notification records"
     },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "Follow relationship documents mapping follower to following"
+    },
     "/postLikes/{likeId}": {
       "schema": "PostLike",
       "description": "Permanent post likes mapping user to post"
@@ -610,6 +998,18 @@
     "/postReposts/{repostId}": {
       "schema": "PostRepost",
       "description": "Permanent post reposts mapping user to post"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "OrbitNotification",
+      "description": "Top-level real-time notification records across Orbit activities"
+    },
+    "/groups/{groupId}": {
+      "schema": "GroupChat",
+      "description": "Group conversation metadata, settings, and member rosters"
+    },
+    "/groups/{groupId}/messages/{messageId}": {
+      "schema": "GroupChatMessage",
+      "description": "Messages inside a group conversation"
     }
   }
 }

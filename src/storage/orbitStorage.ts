@@ -134,8 +134,8 @@ export function calculateSignalMetrics(
   // Following activity (up to 15 pts)
   const followingScore = Math.min(15, (followingIds || []).length * 5);
 
-  // Followers score
-  const followersScore = 0;
+  // Followers score (up to 10 pts)
+  const followersScore = Math.min(10, (user.followerCount || 0) * 5);
 
   // Conversations & stories (up to 10 pts)
   const convoScore = Math.min(5, myConversations.length * 2.5);
@@ -175,7 +175,7 @@ export function calculateSignalMetrics(
   }
 
   // Reach count computation based on actual interactions and posts
-  const reachCount = myPosts.length + followingIds.length + likesReceived;
+  const reachCount = myPosts.length + (followingIds || []).length + (user.followerCount || 0) + likesReceived;
 
   // Next Moves Calculation
   const nextMoves: NextMoveItem[] = [];

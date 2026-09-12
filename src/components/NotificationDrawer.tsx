@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, CheckCheck, Trash2, Heart, UserPlus, MessageSquare, Radio, Bell } from 'lucide-react';
+import { X, CheckCheck, Trash2, Heart, UserPlus, MessageSquare, Radio, Bell, Flame } from 'lucide-react';
 import { useOrbit } from '../context/OrbitContext';
 import { NotificationType } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -34,6 +34,8 @@ export const NotificationDrawer: React.FC = () => {
     switch (type) {
       case 'like':
         return <Heart className="w-3 h-3 text-rose-500 fill-rose-500" />;
+      case 'story_reaction':
+        return <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />;
       case 'follow':
         return <UserPlus className="w-3 h-3 text-white" />;
       case 'message':

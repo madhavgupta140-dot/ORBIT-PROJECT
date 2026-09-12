@@ -17,11 +17,15 @@ export const UserProfileModal: React.FC = () => {
     viewingProfileUser,
     closeProfilePreview,
     currentUser,
+    allUsers,
     followUser,
     unfollowUser,
     isFollowing,
+    followingIds,
+    followerIds,
     posts,
     openNewMessage,
+    openFollowList,
   } = useOrbit();
 
   useEffect(() => {
@@ -36,10 +40,17 @@ export const UserProfileModal: React.FC = () => {
 
   if (!viewingProfileUser) return null;
 
-  const isMe = currentUser ? viewingProfileUser.id === currentUser.id : false;
-  const following = isFollowing(viewingProfileUser.id);
-  const userPosts = posts.filter((p) => p.authorId === viewingProfileUser.id);
-  const displayLocation = viewingProfileUser.countryName || viewingProfileUser.location;
+  const liveUser = allUsers.find((u) => u.id === viewingProfileUser.id) || (currentUser?.id === viewingProfileUser.id ? currentUser : viewingProfileUser);
+  const isMe = currentUser ? liveUser.id === currentUser.id : false;
+  const following = isFollowing(liveUser.id);
+  const userPosts = posts.filter((p) => p.authorId === liveUser.id);
+  const displayLocation = liveUser.countryName || liveUser.location;
+  const followerCount = isMe
+    ? (typeof currentUser?.followerCount === 'number' ? Math.max(currentUser.followerCount, followerIds.length) : followerIds.length)
+    : (typeof liveUser.followerCount === 'number' ? liveUser.followerCount : (typeof liveUser.followersCount === 'number' ? liveUser.followersCount : 0));
+  const followingCount = isMe
+    ? (typeof currentUser?.followingCount === 'number' ? Math.max(currentUser.followingCount, followingIds.length) : followingIds.length)
+    : (typeof liveUser.followingCount === 'number' ? liveUser.followingCount : 0);
 
   return (
     <div
@@ -76,8 +87,8 @@ export const UserProfileModal: React.FC = () => {
             <div className="flex items-center gap-4">
               <div className="p-1 rounded-full bg-[#121212] shrink-0">
                 <UserAvatar
-                  src={viewingProfileUser.avatar}
-                  name={viewingProfileUser.name}
+                  src={liveUser.avatar}
+                  name={liveUser.name}
                   size="xl"
                   className="border-2 border-stone-800"
                 />
@@ -85,14 +96,14 @@ export const UserProfileModal: React.FC = () => {
               <div className="flex flex-col pt-3">
                 <div className="flex items-center gap-1.5">
                   <h2 className="font-bold text-lg text-stone-100">
-                    {viewingProfileUser.name}
+                    {liveUser.name}
                   </h2>
-                  {viewingProfileUser.verified && (
+                  {liveUser.verified && (
                     <CheckCircle2 className="w-4 h-4 text-white fill-white/20" />
                   )}
                 </div>
                 <span className="text-xs text-stone-500 font-mono">
-                  @{viewingProfileUser.username}
+                  @{liveUser.username}
                 </span>
                 <div className="flex items-center gap-3 mt-1 text-xs text-stone-500">
                   {displayLocation && (
@@ -101,12 +112,30 @@ export const UserProfileModal: React.FC = () => {
                       {displayLocation}
                     </span>
                   )}
-                  {viewingProfileUser.website && (
+                  {liveUser.website && (
                     <span className="flex items-center gap-1">
                       <Globe className="w-3 h-3 text-stone-400" />
-                      {viewingProfileUser.website.replace('https://', '')}
+                      {liveUser.website.replace('https://', '')}
                     </span>
                   )}
+                </div>
+                <div className="flex items-center gap-4 mt-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => openFollowList('following', liveUser)}
+                    className="hover:underline cursor-pointer focus:outline-none transition-colors hover:text-stone-300"
+                  >
+                    <span className="font-bold text-stone-100">{followingCount}</span>{' '}
+                    <span className="text-stone-500">Following</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openFollowList('followers', liveUser)}
+                    className="hover:underline cursor-pointer focus:outline-none transition-colors hover:text-stone-300"
+                  >
+                    <span className="font-bold text-stone-100">{followerCount}</span>{' '}
+                    <span className="text-stone-500">Followers</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -128,7 +157,7 @@ export const UserProfileModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    following ? unfollowUser(viewingProfileUser.id) : followUser(viewingProfileUser.id)
+                    following ? unfollowUser(liveUser.id) : followUser(liveUser.id)
                   }
                   className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
                     following
@@ -153,10 +182,10 @@ export const UserProfileModal: React.FC = () => {
           </div>
 
           {/* Bio */}
-          {viewingProfileUser.bio && (
+          {liveUser.bio && (
             <div className="py-4 border-b border-stone-800/80">
               <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
-                {viewingProfileUser.bio}
+                {liveUser.bio}
               </p>
             </div>
           )}

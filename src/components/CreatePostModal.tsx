@@ -5,35 +5,62 @@ import {
   Globe,
   Trash2,
   Smile,
+  AlertCircle,
+  RefreshCw,
+  XCircle,
+  Loader2,
 } from 'lucide-react';
 import { useOrbit } from '../context/OrbitContext';
 import { VisibilityType } from '../types';
 import { UserAvatar } from './UserAvatar';
+import {
+  uploadMedia,
+  deleteUploadedMedia,
+  UploadCanceledError,
+  CancellableUpload,
+} from '../services/mediaUploadService';
 
 export const CreatePostModal: React.FC = () => {
   const { isCreatePostOpen, closeCreatePost, createPost, showToast, currentUser, settings } = useOrbit();
 
   const [text, setText] = useState('');
   const [visibility, setVisibility] = useState<VisibilityType>(settings?.privacy?.defaultPostVisibility || 'Public');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [mediaUrl, setMediaUrl] = useState<string | undefined>(undefined);
   const [mediaType, setMediaType] = useState<'image' | 'video' | undefined>(undefined);
   const [mediaName, setMediaName] = useState<string | undefined>(undefined);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const activeUploadRef = useRef<CancellableUpload | null>(null);
 
   // Focus textarea when modal opens
   useEffect(() => {
     if (isCreatePostOpen) {
       setVisibility(settings?.privacy?.defaultPostVisibility || 'Public');
+      setUploadError(null);
+      setUploadProgress(0);
       setTimeout(() => textareaRef.current?.focus(), 50);
     } else {
+      if (activeUploadRef.current) {
+        activeUploadRef.current.cancel();
+        activeUploadRef.current = null;
+      }
       setText('');
+      setSelectedFile(null);
+      if (mediaUrl && mediaUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(mediaUrl);
+      }
       setMediaUrl(undefined);
       setMediaType(undefined);
       setMediaName(undefined);
+      setIsSubmitting(false);
+      setUploadProgress(0);
+      setUploadError(null);
       setVisibility(settings?.privacy?.defaultPostVisibility || 'Public');
     }
   }, [isCreatePostOpen, settings?.privacy?.defaultPostVisibility]);
@@ -41,13 +68,13 @@ export const CreatePostModal: React.FC = () => {
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isCreatePostOpen) {
+      if (e.key === 'Escape' && isCreatePostOpen && !isSubmitting) {
         closeCreatePost();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCreatePostOpen, closeCreatePost]);
+  }, [isCreatePostOpen, closeCreatePost, isSubmitting]);
 
   if (!isCreatePostOpen || !currentUser) return null;
 
@@ -66,10 +93,16 @@ export const CreatePostModal: React.FC = () => {
       return;
     }
 
+    if (mediaUrl && mediaUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(mediaUrl);
+    }
+
+    setSelectedFile(file);
     const objectUrl = URL.createObjectURL(file);
     setMediaUrl(objectUrl);
     setMediaType(isImage ? 'image' : 'video');
     setMediaName(file.name);
+    setUploadError(null);
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,36 +121,118 @@ export const CreatePostModal: React.FC = () => {
   };
 
   const handleRemoveMedia = () => {
-    if (mediaUrl) {
+    if (activeUploadRef.current) {
+      activeUploadRef.current.cancel();
+      activeUploadRef.current = null;
+    }
+    if (mediaUrl && mediaUrl.startsWith('blob:')) {
       URL.revokeObjectURL(mediaUrl);
     }
+    setSelectedFile(null);
     setMediaUrl(undefined);
     setMediaType(undefined);
     setMediaName(undefined);
+    setUploadError(null);
+    setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text.trim() && !mediaUrl) {
+  const handleCancelUpload = () => {
+    if (activeUploadRef.current) {
+      activeUploadRef.current.cancel();
+      activeUploadRef.current = null;
+    }
+    setIsSubmitting(false);
+    setUploadProgress(0);
+    showToast('Upload Canceled', 'Media upload was canceled.', 'default');
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
+    if (!text.trim() && !mediaUrl && !selectedFile) {
       showToast('Empty Post', 'Please write something or attach an image.', 'alert');
       return;
     }
 
     setIsSubmitting(true);
+    setUploadError(null);
+    setUploadProgress(0);
 
-    createPost({
-      text: text.trim(),
-      media: mediaUrl,
-      mediaType,
-      mediaName,
-      visibility,
-    });
+    const generatedPostId = `post_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let uploadedStoragePath: string | undefined = undefined;
 
-    setIsSubmitting(false);
-    closeCreatePost();
+    try {
+      let finalMediaUrl = mediaUrl;
+      let downloadURL: string | undefined = undefined;
+      let storagePath: string | undefined = undefined;
+
+      // Resumable upload through unified mediaUploadService
+      if (selectedFile && currentUser) {
+        const uploadTask = uploadMedia({
+          file: selectedFile,
+          folder: 'posts',
+          entityId: generatedPostId,
+          onProgress: (pct) => setUploadProgress(pct),
+        });
+
+        activeUploadRef.current = uploadTask;
+        const uploadResult = await uploadTask.promise;
+        activeUploadRef.current = null;
+
+        downloadURL = uploadResult.downloadURL;
+        storagePath = uploadResult.storagePath;
+        uploadedStoragePath = uploadResult.storagePath;
+        finalMediaUrl = uploadResult.downloadURL;
+
+        if (!downloadURL) {
+          throw new Error('Download URL verification failed');
+        }
+      }
+
+      const mediaUrls = downloadURL ? [downloadURL] : (finalMediaUrl && !finalMediaUrl.startsWith('blob:') ? [finalMediaUrl] : []);
+      const storagePaths = storagePath ? [storagePath] : [];
+
+      const created = await createPost({
+        text: text.trim(),
+        media: finalMediaUrl,
+        mediaUrl: finalMediaUrl,
+        mediaUrls,
+        downloadURL,
+        storagePath,
+        storagePaths,
+        mediaType: mediaType || (mediaUrls.length > 0 ? 'image' : undefined),
+        mediaName,
+        visibility,
+      });
+
+      if (created) {
+        closeCreatePost();
+      }
+    } catch (err: any) {
+      if (err instanceof UploadCanceledError || err?.name === 'UploadCanceledError') {
+        setIsSubmitting(false);
+        setUploadProgress(0);
+        return;
+      }
+
+      console.error('[ORBIT] Post creation failed in modal:', err);
+      // Clean up uploaded storage file if database creation failed
+      if (uploadedStoragePath) {
+        try {
+          await deleteUploadedMedia(uploadedStoragePath);
+        } catch {}
+      }
+
+      const msg = err?.userFacingMessage || err?.message || 'Failed to publish post. Please try again.';
+      setUploadError(msg);
+      showToast('Upload Error', msg, 'alert');
+    } finally {
+      activeUploadRef.current = null;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -125,7 +240,7 @@ export const CreatePostModal: React.FC = () => {
       id="create-post-modal-backdrop"
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto select-none"
       onClick={(e) => {
-        if (e.target === e.currentTarget) closeCreatePost();
+        if (!isSubmitting && e.target === e.currentTarget) closeCreatePost();
       }}
     >
       <div
@@ -144,8 +259,9 @@ export const CreatePostModal: React.FC = () => {
 
           <button
             onClick={closeCreatePost}
+            disabled={isSubmitting}
             aria-label="Close dialog"
-            className="p-1.5 text-stone-400 hover:text-stone-100 hover:bg-stone-800 rounded-full transition-colors cursor-pointer"
+            className="p-1.5 text-stone-400 hover:text-stone-100 hover:bg-stone-800 disabled:opacity-40 disabled:hover:bg-transparent rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -177,11 +293,12 @@ export const CreatePostModal: React.FC = () => {
             <textarea
               ref={textareaRef}
               value={text}
+              disabled={isSubmitting}
               maxLength={280}
               onChange={(e) => setText(e.target.value)}
               placeholder="What's happening? Share design updates, code, or ideas..."
               rows={4}
-              className="w-full bg-transparent border-0 text-sm text-stone-100 placeholder:text-stone-600 focus:outline-none resize-none leading-relaxed"
+              className="w-full bg-transparent border-none text-stone-100 text-sm placeholder:text-stone-500 focus:outline-none resize-none disabled:opacity-50"
             />
             <div className="flex justify-end">
               <span
@@ -194,7 +311,7 @@ export const CreatePostModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Media Upload Area */}
+          {/* Drag and Drop Media Upload Zone */}
           {!mediaUrl ? (
             <div
               onDragOver={(e) => {
@@ -203,46 +320,106 @@ export const CreatePostModal: React.FC = () => {
               }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+              onClick={() => !isSubmitting && fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
                 isDragging
-                  ? 'border-white bg-white/5 text-stone-100'
-                  : 'border-stone-800 hover:border-stone-700 bg-[#161616] text-stone-400'
+                  ? 'border-white bg-stone-900/50'
+                  : 'border-stone-800 hover:border-stone-700 bg-stone-900/20'
               }`}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,video/mp4,video/webm"
+                accept="image/*,video/*"
                 className="hidden"
+                disabled={isSubmitting}
                 onChange={handleFileInputChange}
               />
-              <ImageIcon className="w-6 h-6 text-stone-300 mb-1.5" />
-              <p className="font-bold text-xs text-stone-200">
-                Click or drag photos & videos here
-              </p>
-              <p className="text-[10px] text-stone-500 mt-0.5">
-                JPG, PNG, WebM up to 25 MB
-              </p>
+              <ImageIcon className="w-6 h-6 text-stone-400" />
+              <div className="text-center">
+                <p className="text-xs font-semibold text-stone-300">
+                  Click or drag and drop photos or videos
+                </p>
+                <p className="text-[10px] text-stone-500 mt-0.5">
+                  Supports JPG, PNG, WebM, MP4 up to 25MB
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="relative rounded-xl overflow-hidden border border-stone-800 bg-black max-h-60 flex items-center justify-center">
+            /* Media Preview Box */
+            <div className="relative rounded-xl overflow-hidden border border-stone-800 bg-black/60 max-h-60 flex items-center justify-center">
               {mediaType === 'video' ? (
-                <video src={mediaUrl} controls className="w-full max-h-60 object-contain" />
+                <video
+                  src={mediaUrl}
+                  controls
+                  className="max-h-60 w-full object-contain"
+                />
               ) : (
                 <img
                   src={mediaUrl}
-                  alt="Upload preview"
-                  className="w-full max-h-60 object-cover"
+                  alt="Post preview"
+                  className="max-h-60 w-full object-cover"
                 />
               )}
+              {!isSubmitting && (
+                <button
+                  type="button"
+                  onClick={handleRemoveMedia}
+                  aria-label="Remove media"
+                  className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white hover:text-red-400 rounded-full transition-colors cursor-pointer shadow-md"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Progress bar during media upload */}
+          {isSubmitting && selectedFile && (
+            <div className="bg-stone-900/90 border border-stone-700/80 rounded-xl p-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-stone-200">
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                  <span>Uploading media to cloud…</span>
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-stone-300">{uploadProgress}%</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelUpload}
+                    className="text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer font-medium hover:underline"
+                  >
+                    <XCircle className="w-3 h-3" />
+                    <span>Cancel</span>
+                  </button>
+                </div>
+              </div>
+              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-white h-full transition-all duration-150 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Error Banner with Retry */}
+          {uploadError && !isSubmitting && (
+            <div className="bg-red-950/40 border border-red-800/80 rounded-xl p-3 flex items-start justify-between gap-3 text-red-300 text-xs">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-red-200">Upload failed</p>
+                  <p className="text-[11px] text-red-300/80 mt-0.5">{uploadError}</p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={handleRemoveMedia}
-                className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white hover:text-red-400 rounded-full transition-colors cursor-pointer"
-                title="Remove media"
+                onClick={() => handleSubmit()}
+                className="px-2.5 py-1 bg-red-800 hover:bg-red-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
+                <RefreshCw className="w-3 h-3" />
+                <span>Retry</span>
               </button>
             </div>
           )}
@@ -252,8 +429,9 @@ export const CreatePostModal: React.FC = () => {
             <div className="flex items-center gap-1.5 text-stone-400">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => setText((prev) => `${prev} ✨ `)}
-                className="p-1.5 hover:text-white hover:bg-stone-800 rounded-full transition-colors cursor-pointer"
+                className="p-1.5 hover:text-white hover:bg-stone-800 disabled:opacity-40 rounded-full transition-colors cursor-pointer"
                 title="Add emoji"
               >
                 <Smile className="w-4 h-4" />
@@ -263,17 +441,25 @@ export const CreatePostModal: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={closeCreatePost}
-                className="px-4 py-2 rounded-full text-xs font-semibold text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-full text-xs font-semibold text-stone-400 hover:text-stone-200 disabled:opacity-40 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || (!text.trim() && !mediaUrl)}
-                className="px-5 py-2 bg-white hover:bg-stone-200 disabled:opacity-40 disabled:hover:bg-white text-black font-bold text-xs rounded-full transition-all shadow-md cursor-pointer active:scale-95"
+                className="px-5 py-2 bg-white hover:bg-stone-200 disabled:opacity-40 disabled:hover:bg-white text-black font-bold text-xs rounded-full transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-1.5"
               >
-                {isSubmitting ? 'Posting...' : 'Post'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{selectedFile ? `Uploading ${uploadProgress}%` : 'Posting…'}</span>
+                  </>
+                ) : (
+                  'Post'
+                )}
               </button>
             </div>
           </div>
@@ -282,3 +468,4 @@ export const CreatePostModal: React.FC = () => {
     </div>
   );
 };
+

@@ -49,6 +49,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     toggleRepost,
     deletePost,
     addComment,
+    deleteComment,
     openProfilePreview,
     getUserById,
     isFollowing,
@@ -285,23 +286,28 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       </div>
 
       {/* Media Attachment with Double-Tap to Like */}
-      {post.media && (
+      {(post.mediaUrl || post.downloadURL || post.media) && (
         <div
           className="relative mb-3 rounded-2xl overflow-hidden border border-stone-800 bg-black/60 max-h-[500px] flex items-center justify-center cursor-pointer select-none"
           onDoubleClick={handleMediaDoubleTap}
         >
           {post.mediaType === 'video' ? (
             <video
-              src={post.media}
+              src={post.mediaUrl || post.downloadURL || post.media}
               controls
+              playsInline
               className="w-full max-h-[500px] object-contain"
             />
           ) : (
             <img
-              src={post.media}
+              src={post.mediaUrl || post.downloadURL || post.media}
               alt={post.mediaName || 'Post media'}
+              referrerPolicy="no-referrer"
               className="w-full max-h-[500px] object-cover object-center hover:scale-[1.01] transition-transform duration-300"
               loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
             />
           )}
 
@@ -327,7 +333,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           title="Replies"
         >
           <MessageCircle className="w-4 h-4 transition-transform group-hover:scale-110" />
-          <span className="font-mono text-xs">{post.comments.length}</span>
+          <span className="font-mono text-xs">{typeof post.commentCount === 'number' ? post.commentCount : post.comments.length}</span>
         </button>
 
         {/* Repost */}
@@ -366,14 +372,16 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
         {/* Bookmark */}
         <button
+          id={`bookmark-btn-${post.id}`}
           type="button"
           onClick={() => toggleSavePost(post.id)}
           className={`p-1.5 rounded-full transition-colors cursor-pointer group ${
             post.savedByMe
-              ? 'text-white bg-white/10'
-              : 'hover:text-white hover:bg-white/10'
+              ? 'text-white bg-white/15 hover:bg-white/20'
+              : 'text-stone-400 hover:text-white hover:bg-white/10'
           }`}
           title={post.savedByMe ? 'Remove from saved' : 'Save post'}
+          aria-label={post.savedByMe ? 'Remove from saved' : 'Save post'}
         >
           <Bookmark
             className={`w-4 h-4 transition-transform group-hover:scale-110 ${
@@ -401,23 +409,35 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             <div className="flex flex-col gap-2.5 max-h-64 overflow-y-auto pr-1">
               {post.comments.map((comment) => (
                 <div
-                  key={comment.id}
-                  className="flex items-start gap-2.5 bg-[#141414] border border-stone-800/80 p-3 rounded-xl text-xs"
+                  key={comment.id || comment.commentId}
+                  className="flex items-start gap-2.5 bg-[#141414] border border-stone-800/80 p-3 rounded-xl text-xs group/comment relative"
                 >
                   <UserAvatar
-                    src={comment.authorAvatar}
-                    name={comment.authorName}
+                    src={comment.avatar || comment.authorAvatar}
+                    name={comment.displayName || comment.authorName}
                     size="xs"
                     className="w-7 h-7 shrink-0 mt-0.5"
                   />
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-stone-200">
-                        {comment.authorName}
+                        {comment.displayName || comment.authorName}
                       </span>
-                      <span className="text-[10px] text-stone-500 font-mono">
-                        {comment.createdAt}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-stone-500 font-mono">
+                          {formatPostDate(comment.createdAt)}
+                        </span>
+                        {currentUser && (comment.authorUid === currentUser.id || comment.authorId === currentUser.id) && (
+                          <button
+                            type="button"
+                            onClick={() => deleteComment(post.id, comment.id || comment.commentId || '')}
+                            className="opacity-0 group-hover/comment:opacity-100 hover:text-red-400 text-stone-500 transition-opacity p-0.5 cursor-pointer"
+                            title="Delete reply"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-stone-300 mt-1 leading-relaxed">
                       {comment.text}

@@ -7,6 +7,8 @@ import {
   Activity,
   ArrowRight,
   Radio,
+  ChevronRight,
+  ChevronLeft,
 } from 'lucide-react';
 import { useOrbit } from '../context/OrbitContext';
 
@@ -27,6 +29,10 @@ export const SignalPanel: React.FC = () => {
     openEditProfile,
     setActiveTab,
     posts,
+    isRightSidebarOpen,
+    toggleRightSidebar,
+    chatWorkspaceMode,
+    activeTab,
   } = useOrbit();
 
   if (!currentUser) return null;
@@ -50,11 +56,47 @@ export const SignalPanel: React.FC = () => {
     }
   };
 
+  if (chatWorkspaceMode === 'expanded' || chatWorkspaceMode === 'fullscreen') {
+    return null;
+  }
+
+  // If collapsed on desktop, render sleek reopen chevron button only if NOT on messages view (where header toggle is used)
+  if (!isRightSidebarOpen) {
+    if (activeTab === 'messages') {
+      return null;
+    }
+    return (
+      <button
+        id="orbit-reopen-sidebar-btn"
+        onClick={toggleRightSidebar}
+        title="Open Utilities (Live Network, Who to Follow)"
+        className="fixed right-3 top-3 z-20 p-2 rounded-xl bg-stone-900/95 hover:bg-stone-850 border border-stone-800 text-stone-400 hover:text-stone-100 shadow-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 text-xs font-mono backdrop-blur-xs"
+      >
+        <ChevronLeft className="w-4 h-4 text-stone-300" />
+        <span className="hidden 2xl:inline text-[11px] text-stone-300">Orbit Panel</span>
+      </button>
+    );
+  }
+
   return (
     <aside
       id="orbit-right-sidebar"
-      className="hidden xl:flex flex-col w-[320px] 2xl:w-[350px] bg-[#0c0c0c] border-l border-stone-800/80 p-4 gap-4 select-none shrink-0 h-screen sticky top-0 overflow-y-auto no-scrollbar"
+      className="hidden xl:flex flex-col w-[320px] 2xl:w-[350px] bg-[#0c0c0c] border-l border-stone-800/80 p-4 gap-4 select-none shrink-0 h-screen sticky top-0 overflow-y-auto no-scrollbar transition-all duration-200 ease-in-out"
     >
+      {/* Header with collapse trigger */}
+      <div className="flex items-center justify-between pb-0.5">
+        <span className="text-[10px] font-mono tracking-wider text-stone-500 uppercase">Orbit Network</span>
+        <button
+          id="orbit-collapse-sidebar-btn"
+          onClick={toggleRightSidebar}
+          title="Collapse Sidebar"
+          className="p-1 text-stone-400 hover:text-white hover:bg-stone-800/80 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs"
+        >
+          <span className="text-[10px] font-mono text-stone-500">Hide</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* 1. Search Bar */}
       <div className="relative">
         <button

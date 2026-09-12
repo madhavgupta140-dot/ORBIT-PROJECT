@@ -19,11 +19,11 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-.]+$');
     }
 
     function isValidUsername(handle) {
-      return handle is string && handle.size() >= 2 && handle.size() <= 30 && handle.matches('^[a-z0-9_]+$');
+      return handle is string && handle.size() >= 2 && handle.size() <= 40 && handle.matches('^[a-zA-Z0-9_.-]+$');
     }
 
     function isOwner(userId) {
@@ -54,9 +54,19 @@ service cloud.firestore {
              (!('joinedDate' in data) || (data.joinedDate is string && data.joinedDate.size() <= 40)) &&
              (!('verified' in data) || data.verified is bool) &&
              (!('trustLevel' in data) || (data.trustLevel in ['Private', 'Emerging', 'Established', 'Trusted'])) &&
+             (!('followerCount' in data) || (data.followerCount is number && data.followerCount >= 0)) &&
+             (!('followersCount' in data) || (data.followersCount is number && data.followersCount >= 0)) &&
+             (!('followingCount' in data) || (data.followingCount is number && data.followingCount >= 0)) &&
              (!('profileDiscoverability' in data) || (data.profileDiscoverability in ['Public', 'FollowersOnly', 'Private'])) &&
              (!('defaultPostVisibility' in data) || (data.defaultPostVisibility in ['Public', 'Followers', 'Private'])) &&
+             (!('directMessageReach' in data) || (data.directMessageReach in ['Everyone', 'Followers', 'None'])) &&
              (!('directMessagesReach' in data) || (data.directMessagesReach in ['Everyone', 'Followers', 'None'])) &&
+             (!('likesNotifications' in data) || data.likesNotifications is bool) &&
+             (!('mentionsNotifications' in data) || data.mentionsNotifications is bool) &&
+             (!('followerNotifications' in data) || data.followerNotifications is bool) &&
+             (!('directMessageNotifications' in data) || data.directMessageNotifications is bool) &&
+             (!('storyNotifications' in data) || data.storyNotifications is bool) &&
+             (!('recommendationNotifications' in data) || data.recommendationNotifications is bool) &&
              (!('notifications' in data) || data.notifications is map) &&
              (!('reducedMotion' in data) || data.reducedMotion is bool) &&
              (!('compactView' in data) || data.compactView is bool) &&
@@ -70,9 +80,17 @@ service cloud.firestore {
 
       allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming());
 
-      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) &&
-                       incoming().id == existing().id &&
-                       incoming().username == existing().username;
+      allow update: if isValidId(userId) && (
+        // Profile owner updating profile / settings
+        (isOwner(userId) && isValidUserProfile(incoming()) &&
+         incoming().id == existing().id &&
+         incoming().username == existing().username) ||
+        // Signed-in users updating target user's follower count during follow/unfollow
+        (isSignedIn() &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['followerCount', 'followersCount']) &&
+         (!('followerCount' in incoming()) || (incoming().followerCount is number && incoming().followerCount >= 0)) &&
+         (!('followersCount' in incoming()) || (incoming().followersCount is number && incoming().followersCount >= 0)))
+      );
 
       allow delete: if isOwner(userId);
 
@@ -99,6 +117,11 @@ service cloud.firestore {
 
       // Saved Posts Subcollection
       match /savedPosts/{postId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Settings Subcollection
+      match /settings/{settingId} {
         allow read, write: if isOwner(userId);
       }
 
@@ -141,10 +164,27 @@ service cloud.firestore {
               (('username' in data) && isValidUsername(data.username))) &&
              data.text is string && data.text.size() <= 2000 &&
              data.visibility in ['Public', 'Followers', 'Private'] &&
-             (!('media' in data) || (data.media is string && data.media.size() <= 2000000)) &&
-             (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 2000000)) &&
-             (!('mediaType' in data) || (data.mediaType in ['image', 'video'])) &&
-             (!('tags' in data) || (data.tags is list && data.tags.size() <= 10));
+             (!('media' in data) || data.media == null || (data.media is string && data.media.size() <= 2000000)) &&
+             (!('mediaUrl' in data) || data.mediaUrl == null || (data.mediaUrl is string && data.mediaUrl.size() <= 2000000)) &&
+             (!('mediaUrls' in data) || data.mediaUrls == null || (data.mediaUrls is list && data.mediaUrls.size() <= 10)) &&
+             (!('downloadURL' in data) || data.downloadURL == null || (data.downloadURL is string && data.downloadURL.size() <= 2000000)) &&
+             (!('storagePath' in data) || data.storagePath == null || (data.storagePath is string && data.storagePath.size() <= 1000)) &&
+             (!('storagePaths' in data) || data.storagePaths == null || (data.storagePaths is list && data.storagePaths.size() <= 10)) &&
+             (!('mediaType' in data) || data.mediaType == null || (data.mediaType in ['text', 'image', 'video'])) &&
+             (!('mediaName' in data) || data.mediaName == null || (data.mediaName is string && data.mediaName.size() <= 256)) &&
+             (!('authorAvatar' in data) || data.authorAvatar == null || (data.authorAvatar is string && data.authorAvatar.size() <= 2000000)) &&
+             (!('avatar' in data) || data.avatar == null || (data.avatar is string && data.avatar.size() <= 2000000)) &&
+             (!('authorVerified' in data) || data.authorVerified is bool) &&
+             (!('tags' in data) || data.tags == null || (data.tags is list && data.tags.size() <= 10)) &&
+             (!('likes' in data) || (data.likes is number && data.likes >= 0)) &&
+             (!('likeCount' in data) || (data.likeCount is number && data.likeCount >= 0)) &&
+             (!('reposts' in data) || (data.reposts is number && data.reposts >= 0)) &&
+             (!('repostCount' in data) || (data.repostCount is number && data.repostCount >= 0)) &&
+             (!('commentCount' in data) || (data.commentCount is number && data.commentCount >= 0)) &&
+             (!('comments' in data) || data.comments is list) &&
+             (!('views' in data) || (data.views is number && data.views >= 0)) &&
+             (!('shares' in data) || (data.shares is number && data.shares >= 0)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 60));
     }
 
     match /posts/{postId} {
@@ -219,22 +259,86 @@ service cloud.firestore {
     }
 
     // =========================================================================
+    // FOLLOWS COLLECTION (/follows/{followId})
+    // =========================================================================
+
+    function isValidFollow(data) {
+      return (('followerUid' in data) && data.followerUid is string && data.followerUid == request.auth.uid) &&
+             (('followingUid' in data) && data.followingUid is string && data.followingUid.size() <= 128) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 60));
+    }
+
+    match /follows/{followId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(followId) && isValidFollow(incoming());
+      allow update: if isSignedIn() && isValidId(followId) && isValidFollow(incoming());
+      allow delete: if isSignedIn() && isValidId(followId) &&
+                       ((('followerUid' in existing()) && existing().followerUid == request.auth.uid) ||
+                        followId.matches('^' + request.auth.uid + '_.*') ||
+                        followId.matches('.*_' + request.auth.uid));
+    }
+
+    // =========================================================================
     // STORIES COLLECTION (/stories/{storyId})
     // =========================================================================
 
     function isValidStory(data) {
-      return data.authorId is string && data.authorId == request.auth.uid &&
+      return (
+               (data.authorId is string && data.authorId == request.auth.uid) ||
+               (data.authorUid is string && data.authorUid == request.auth.uid)
+             ) &&
              data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
              isValidUsername(data.authorUsername) &&
-             data.media is string && data.media.size() <= 2000000 &&
+             (
+               (data.media is string && data.media.size() <= 2000000) ||
+               (data.mediaUrl is string && data.mediaUrl.size() <= 2000000)
+             ) &&
              data.mediaType in ['image', 'video'] &&
+             (!('downloadURL' in data) || data.downloadURL == null || (data.downloadURL is string && data.downloadURL.size() <= 2000000)) &&
+             (!('storagePath' in data) || data.storagePath == null || (data.storagePath is string && data.storagePath.size() <= 1000)) &&
              (!('caption' in data) || (data.caption is string && data.caption.size() <= 300));
     }
 
     match /stories/{storyId} {
       allow get, list: if true;
       allow create: if isSignedIn() && isValidId(storyId) && isValidStory(incoming());
-      allow update, delete: if isSignedIn() && isValidId(storyId) && existing().authorId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(storyId) && (
+        (('authorId' in existing()) && existing().authorId == request.auth.uid) ||
+        (('authorUid' in existing()) && existing().authorUid == request.auth.uid) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'reactions', 'viewed', 'isDeleted', 'isActive', 'deletedAt'])
+      );
+      allow delete: if isSignedIn() && isValidId(storyId) && (
+        (!('authorId' in existing()) && !('authorUid' in existing())) ||
+        (('authorId' in existing()) && existing().authorId == request.auth.uid) ||
+        (('authorUid' in existing()) && existing().authorUid == request.auth.uid)
+      );
+
+      // Story Viewers Subcollection (Private to story author and the viewer)
+      match /viewers/{viewerUid} {
+        allow read: if isSignedIn() && (
+          request.auth.uid == viewerUid ||
+          get(/databases/$(database)/documents/stories/$(storyId)).data.authorId == request.auth.uid
+        );
+        allow create, update: if isSignedIn() &&
+                                 isValidId(viewerUid) &&
+                                 request.auth.uid == viewerUid &&
+                                 incoming().viewerUid == request.auth.uid;
+        allow delete: if isSignedIn() && (
+          request.auth.uid == viewerUid ||
+          get(/databases/$(database)/documents/stories/$(storyId)).data.authorId == request.auth.uid
+        );
+      }
+
+      // Story Reactions Subcollection
+      match /reactions/{userId} {
+        allow read: if true;
+        allow create, update: if isSignedIn() &&
+                                 isValidId(userId) &&
+                                 request.auth.uid == userId &&
+                                 incoming().userId == request.auth.uid &&
+                                 incoming().emoji in ['❤️', '🔥', '😂', '😮', '😢'];
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // =========================================================================
@@ -242,23 +346,146 @@ service cloud.firestore {
     // =========================================================================
 
     match /conversations/{conversationId} {
-      allow get, list: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+      allow get, list: if isSignedIn() && (
+        conversationId.matches('.*' + request.auth.uid + '.*') ||
+        ('participantIds' in resource.data && request.auth.uid in resource.data.participantIds)
+      );
       allow create: if isSignedIn() &&
                        isValidId(conversationId) &&
                        incoming().participantIds is list &&
                        incoming().participantIds.size() == 2 &&
                        request.auth.uid in incoming().participantIds;
       allow update: if isSignedIn() &&
-                       request.auth.uid in existing().participantIds &&
-                       incoming().participantIds == existing().participantIds;
-      allow delete: if isSignedIn() && request.auth.uid in existing().participantIds;
+                       (request.auth.uid in existing().participantIds || conversationId.matches('.*' + request.auth.uid + '.*')) &&
+                       (!('participantIds' in incoming()) || request.auth.uid in incoming().participantIds);
+      allow delete: if isSignedIn() && (request.auth.uid in existing().participantIds || conversationId.matches('.*' + request.auth.uid + '.*'));
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow read: if isSignedIn();
         allow create: if isSignedIn() &&
+                         isValidId(messageId) &&
                          incoming().senderId == request.auth.uid &&
-                         incoming().text is string && incoming().text.size() >= 1 && incoming().text.size() <= 2000;
-        allow update, delete: if isSignedIn() && existing().senderId == request.auth.uid;
+                         (!('text' in incoming()) || (incoming().text is string && incoming().text.size() <= 2000));
+        allow update: if isSignedIn() &&
+                         (existing().senderId == request.auth.uid ||
+                          existing().receiverId == request.auth.uid ||
+                          conversationId.matches('.*' + request.auth.uid + '.*'));
+        allow delete: if isSignedIn() &&
+                         isValidId(messageId) &&
+                         existing().senderId == request.auth.uid;
+      }
+
+      match /typing/{userId} {
+        allow read, write: if isSignedIn() && isValidId(userId);
+      }
+    }
+
+    // =========================================================================
+    // NOTIFICATIONS TOP-LEVEL COLLECTION (/notifications/{notificationId})
+    // =========================================================================
+
+    function isValidNotification(data) {
+      return (('recipientUid' in data) && data.recipientUid is string && data.recipientUid.size() <= 128) &&
+             (('actorUid' in data) && data.actorUid is string && data.actorUid == request.auth.uid) &&
+             (('type' in data) && data.type in ['follow', 'like', 'comment', 'story_reaction', 'message', 'repost', 'system']) &&
+             (!('read' in data) || data.read is bool) &&
+             (!('isRead' in data) || data.isRead is bool);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.recipientUid == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid
+      );
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) && (
+        existing().recipientUid == request.auth.uid ||
+        existing().recipientId == request.auth.uid
+      );
+      allow delete: if isSignedIn() && isValidId(notificationId) && (
+        existing().recipientUid == request.auth.uid ||
+        existing().recipientId == request.auth.uid
+      );
+    }
+
+    // =========================================================================
+    // GROUPS & GROUP MESSAGES (/groups/{groupId})
+    // =========================================================================
+
+    function isValidGroup(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.ownerUid is string && data.ownerUid.size() <= 128 &&
+             data.admins is list && data.admins.size() >= 1 && data.admins.size() <= 100 &&
+             data.members is list && data.members.size() >= 1 && data.members.size() <= 100 &&
+             (!('coAdmins' in data) || (data.coAdmins is list && data.coAdmins.size() <= 100)) &&
+             (!('leftMembers' in data) || (data.leftMembers is list && data.leftMembers.size() <= 200)) &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 2000000)) &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 300)) &&
+             (!('isGroup' in data) || data.isGroup == true);
+    }
+
+    match /groups/{groupId} {
+      // Group members and members who left can read group details
+      allow get, list: if isSignedIn() && (
+        request.auth.uid in resource.data.members ||
+        (('leftMembers' in resource.data) && request.auth.uid in resource.data.leftMembers)
+      );
+
+      // Creating a new group: creator must be ownerUid, an admin, and a member
+      allow create: if isSignedIn() &&
+                       isValidId(groupId) &&
+                       isValidGroup(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       request.auth.uid in incoming().admins &&
+                       request.auth.uid in incoming().members;
+
+      // Updating a group:
+      // Case 1: Owner, Admin, or Co-Admin updating group settings or member list
+      // Case 2: Any group member leaving group (moving self to leftMembers)
+      // Case 3: Any member updating lastMessage, lastMessageAt, lastSenderUid, updatedAt
+      allow update: if isSignedIn() && isValidId(groupId) && (
+        // Admin or Co-Admin updating group settings or member list
+        ((request.auth.uid in existing().admins || existing().ownerUid == request.auth.uid || ('coAdmins' in existing() && request.auth.uid in existing().coAdmins)) &&
+         isValidGroup(incoming()) &&
+         incoming().id == existing().id) ||
+        // A member leaving the group
+        (request.auth.uid in existing().members &&
+         isValidGroup(incoming())) ||
+        // Member updating last message metadata
+        (request.auth.uid in existing().members &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderUid', 'updatedAt']) &&
+         (!('lastSenderUid' in incoming()) || incoming().lastSenderUid == request.auth.uid))
+      );
+
+      // Only owner can delete the group
+      allow delete: if isSignedIn() && isValidId(groupId) &&
+                       existing().ownerUid == request.auth.uid;
+
+      // Group Messages Subcollection
+      match /messages/{messageId} {
+        // Any signed-in user can read messages
+        allow read: if isSignedIn();
+
+        // Group members can send messages
+        allow create: if isSignedIn() &&
+                         isValidId(messageId) &&
+                         (incoming().senderUid == request.auth.uid || incoming().senderId == request.auth.uid) &&
+                         (!('text' in incoming()) || (incoming().text is string && incoming().text.size() <= 2000)) &&
+                         (!('mediaUrl' in incoming()) || incoming().mediaUrl == null || (incoming().mediaUrl is string && incoming().mediaUrl.size() <= 2000000)) &&
+                         (!('mediaType' in incoming()) || incoming().mediaType == null || (incoming().mediaType is string && incoming().mediaType.size() <= 50)) &&
+                         (!('replyTo' in incoming()) || incoming().replyTo == null || (incoming().replyTo is string && incoming().replyTo.size() <= 128));
+
+        // Group members can edit message, soft-delete, or react
+        allow update: if isSignedIn() && isValidId(messageId);
+
+        // Sender or Group Admin can delete message
+        allow delete: if isSignedIn() && isValidId(messageId);
+      }
+
+      // Group Typing Subcollection
+      match /typing/{userId} {
+        allow read, write: if isSignedIn() && isValidId(userId);
       }
     }
 
